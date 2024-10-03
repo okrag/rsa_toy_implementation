@@ -1,7 +1,17 @@
 use crate::primes::rand_prime;
 use num_bigint::{BigUint, ToBigUint};
-use num_traits::{One, ToBytes};
+use num_traits::{One, ToBytes, Zero};
 use crate::padding;
+
+pub fn nwd(mut a: BigUint, mut b: BigUint) -> BigUint {
+    while b != BigUint::zero() {
+        let t =  &a % &b;
+        a = b;
+        b = t;
+    }
+
+    a
+}
 
 /// Generuje klucz RSA.
 pub fn generate_keypair(bits: usize) -> (BigUint, BigUint, BigUint) {
@@ -12,14 +22,16 @@ pub fn generate_keypair(bits: usize) -> (BigUint, BigUint, BigUint) {
     let q = rand_prime(&mut rng, bits / 2);
     let n = &p * &q;
 
-    // Krok 2: Obliczamy φ(n) = (p-1)(q-1)
-    let phi = (p.clone() - BigUint::one()) * (q.clone() - BigUint::one());
+    // Krok 2: Obliczamy λ(n) = NWW(λ(p), λ(q)) = NWW((p-1), (q-1)) = (p-1)(q-1) / NWD(p-1, q-1)
+    let p_1 = &p - 1u8;
+    let q_1 = &q - 1u8;
+    let lambda = (&p_1 * &q_1) / nwd(p_1, q_1);
 
-    // Krok 3: Wybieramy publiczny wykładnik e (najczęściej 65537)
+    // Krok 3: Wybieramy publiczny wykładnik e względnie pierwszy do λ(n) (najczęściej 65537)
     let e = 65537.to_biguint().unwrap();
 
-    // Krok 4: Wybieramy prywatny wykładnik d, gdzie d ≡ e^(-1) mod φ(n)
-    let d = e.modinv(&phi).unwrap();
+    // Krok 4: Wybieramy prywatny wykładnik d, gdzie d ≡ e^(-1) mod λ(n)
+    let d = e.modinv(&lambda).unwrap();
 
     (n, e, d)
 }
